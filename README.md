@@ -39,6 +39,6 @@
 4. 打开 Assets/Scenes/Main.unity，点击 Play。
 5. 如果需要把武将数据变成可在 Inspector 中编辑的资源，执行菜单 **Sanguo → Import Hero Catalog**。
 
-当前 UI 和战斗入口属于功能原型；敌人路径、自动攻击、波次、奖励结算、存档和正式美术仍在后续开发范围。GitHub 提交尚未在本环境中通过 Unity Editor 实际构建验证。
+当前已实现：固定路径敌人行军、按"最接近基地"优先的自动索敌、5 波次战斗、击杀与通关金币奖励、暂停/继续、本地 JSON 存档（版本迁移 + 原子写入，启动时自动恢复）。数值集中在 `BattleTuning` 中统一配置。正式美术、音效与更深的养成线仍在后续开发范围。GitHub 提交尚未在本环境中通过 Unity Editor 实际构建验证。
 
 建议使用 Unity 2022.3 LTS 或更新的 LTS 版本。
