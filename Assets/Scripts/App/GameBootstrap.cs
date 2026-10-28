@@ -40,6 +40,7 @@ namespace SanguoTowerDefense.App
         private BattleController battleController;
         private int currency = 0;
         private int selectedIndex;
+        private int nextFormationSlot;
         private bool battleRunning;
         private int wave;
         private int baseHealth = 20;
@@ -175,11 +176,20 @@ namespace SanguoTowerDefense.App
             if (selected == null) { RefreshUi("请先选择武将。"); return; }
             var slots = formation.GetSnapshot();
             var index = Array.FindIndex(slots.ToArray(), string.IsNullOrEmpty);
-            if (index < 0) index = 0;
+            if (index < 0)
+            {
+                index = nextFormationSlot % slots.Count;
+                nextFormationSlot = (index + 1) % slots.Count;
+            }
+            else
+            {
+                nextFormationSlot = (index + 1) % slots.Count;
+            }
+
             if (formation.TrySwitchHero(index, selected.InstanceId, out var error))
             {
                 if (battleRunning) SyncBattleHeroes();
-                RefreshUi(GetName(selected.HeroId) + " 已部署到点位 " + (index + 1) + "。");
+                RefreshUi(GetName(selected.HeroId) + " 已部署/切换到点位 " + (index + 1) + "。");
             }
             else RefreshUi(error);
         }
