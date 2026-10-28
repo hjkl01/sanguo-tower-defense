@@ -21,6 +21,28 @@ namespace SanguoTowerDefense.Battle
         public const float LevelAttackGrowth = 0.25f;
         public const float LevelRangeGrowth = 0.03f;
 
+        // Enemy curve: hp = BaseEnemyHealth + Wave * EnemyHealthPerWave,
+        // speed = BaseEnemySpeed + Wave * EnemySpeedPerWave, reward = BaseEnemyReward + Wave.
+        public const int BaseEnemyHealth = 10;
+        public const int EnemyHealthPerWave = 6;
+        public const float BaseEnemySpeed = 0.9f;
+        public const float EnemySpeedPerWave = 0.12f;
+        public const int BaseEnemyReward = 4;
+        public const int MaxSpawnInterval = 11;   // x0.1 seconds, keeps spacing integers below.
+
+        /// <summary>Enemies in a wave: 5 on wave 1, growing by one per wave.</summary>
+        public static int EnemiesInWave(int wave) => 4 + Mathf.Max(1, wave);
+
+        public static int EnemyHealthAtWave(int wave) => BaseEnemyHealth + wave * EnemyHealthPerWave;
+
+        public static float EnemySpeedAtWave(int wave) => BaseEnemySpeed + wave * EnemySpeedPerWave;
+
+        public static int EnemyRewardAtWave(int wave) => BaseEnemyReward + wave;
+
+        /// <summary>Seconds between spawns within a wave (tightens as waves progress).</summary>
+        public static float SpawnIntervalAtWave(int wave) =>
+            Mathf.Min(MaxSpawnInterval, 13 - wave) * 0.1f;
+
         public static int AttackAtLevel(int baseAttack, int level)
         {
             var scaled = baseAttack * (1f + (level - 1) * LevelAttackGrowth);

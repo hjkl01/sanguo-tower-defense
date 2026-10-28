@@ -53,7 +53,9 @@ namespace SanguoTowerDefense.Battle
             {
                 foreach (var enemy in enemies)
                 {
-                    if (enemy == null || !enemy.IsAlive) continue;
+                    // Destroyed Unity objects do not compare equal to null as managed references;
+                    // check both so a stale list entry can never throw here.
+                    if (enemy == null || enemy.Equals(null) || !enemy.IsAlive) continue;
                     var distance = Vector2.Distance(transform.position, enemy.transform.position);
                     if (distance > range) continue;
                     // Prioritize the enemy closest to the base instead of the nearest one.

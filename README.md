@@ -26,6 +26,7 @@
 - [游戏设计文档](docs/GAME_DESIGN.md)
 - [技术架构文档](docs/ARCHITECTURE.md)
 - [开发路线图](docs/ROADMAP.md)
+- [部署与运行指南](docs/DEPLOYMENT.md)
 
 ## 当前阶段
 

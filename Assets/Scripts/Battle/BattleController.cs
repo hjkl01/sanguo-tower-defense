@@ -49,6 +49,7 @@ namespace SanguoTowerDefense.Battle
         private float spawnTimer;
         private float intermissionTimer;
         private bool waitingForNextWave;
+        private bool waveClearedBonusPaid;
         private bool battleFinished;
 
         public bool IsRunning => running;
@@ -89,9 +90,17 @@ namespace SanguoTowerDefense.Battle
             battleFinished = false;
             currentWave = 1;
             baseHealth = BattleTuning.StartingBaseHealth;
+            waveClearedBonusPaid = false;
             onBaseHealthChanged?.Invoke(baseHealth);
             BeginWave();
             onStatusChanged?.Invoke("战斗开始：第 1/" + BattleTuning.MaxWaves + " 波。击败敌人可获得金币。");
+        }
+
+        public void TogglePause()
+        {
+            if (!running || battleFinished) return;
+            paused = !paused;
+            onStatusChanged?.Invoke(paused ? "战斗已暂停。" : "战斗继续。");
         }
 
         public void StopBattle()
@@ -118,7 +127,7 @@ namespace SanguoTowerDefense.Battle
             if (!running || paused) return;
 
             for (var i = enemies.Count - 1; i >= 0; i--)
-                if (enemies[i] == null || !enemies[i].IsAlive)
+                if (enemies[i] == null || !IsLive(enemies[i]) || !enemies[i].IsAlive)
                     enemies.RemoveAt(i);
 
             if (spawnedThisWave < enemiesThisWave)
@@ -128,7 +137,7 @@ namespace SanguoTowerDefense.Battle
                 {
                     SpawnEnemy();
                     spawnedThisWave++;
-                    spawnTimer = Mathf.Max(0.45f, 1.1f - currentWave * 0.08f);
+                    spawnTimer = BattleTuning.SpawnIntervalAtWave(currentWave);
                 }
                 return;
             }
@@ -136,8 +145,10 @@ namespace SanguoTowerDefense.Battle
             if (CountLivingEnemies() > 0) return;
 
             // Wave cleared: pay the fixed bonus before checking for final victory.
-            if (!waitingForNextWave && currentWave >= 1 && spawnedThisWave >= enemiesThisWave)
+            // waveClearedBonusPaid guards against paying twice while waiting in intermission.
+            if (!waitingForNextWave && !waveClearedBonusPaid && currentWave >= 1 && spawnedThisWave >= enemiesThisWave)
             {
+                waveClearedBonusPaid = true;
                 onCoinsEarned?.Invoke(BattleTuning.WaveClearBonus);
             }
 
@@ -145,6 +156,7 @@ namespace SanguoTowerDefense.Battle
             {
                 running = false;
                 battleFinished = true;
+                paused = false;
                 onStatusChanged?.Invoke("第 " + BattleTuning.MaxWaves + " 波完成，获得 " + BattleTuning.WaveClearBonus + " 金币奖励。");
                 onBattleEnded?.Invoke("胜利！完成全部 " + BattleTuning.MaxWaves + " 波次。");
                 return;
@@ -171,9 +183,10 @@ namespace SanguoTowerDefense.Battle
         private void BeginWave()
         {
             spawnedThisWave = 0;
-            enemiesThisWave = 4 + currentWave * 2;
+            enemiesThisWave = BattleTuning.EnemiesInWave(currentWave);
             spawnTimer = 0.1f;
             waitingForNextWave = false;
+            waveClearedBonusPaid = false;
         }
 
         private void SpawnEnemy()
@@ -186,8 +199,9 @@ namespace SanguoTowerDefense.Battle
             renderer.sortingOrder = 5;
             enemyObject.transform.localScale = new Vector3(0.38f, 0.38f, 1f);
             var enemy = enemyObject.AddComponent<EnemyUnit>();
-            enemy.Initialize(path, 16 + currentWave * 8, 1.05f + currentWave * 0.12f,
-                3 + currentWave, HandleEnemyKilled, HandleEnemyReachedBase);
+            enemy.Initialize(path, BattleTuning.EnemyHealthAtWave(currentWave),
+                BattleTuning.EnemySpeedAtWave(currentWave), BattleTuning.EnemyRewardAtWave(currentWave),
+                HandleEnemyKilled, HandleEnemyReachedBase);
             enemies.Add(enemy);
         }
 
@@ -204,6 +218,7 @@ namespace SanguoTowerDefense.Battle
             {
                 running = false;
                 battleFinished = true;
+                paused = false;
                 ClearEnemies();
                 onBattleEnded?.Invoke("失败：基地生命归零。");
             }
@@ -216,13 +231,23 @@ namespace SanguoTowerDefense.Battle
         private int CountLivingEnemies()
         {
             var count = 0;
-            foreach (var enemy in enemies) if (enemy != null && enemy.IsAlive) count++;
+            foreach (var enemy in enemies)
+                if (enemy != null && IsLive(enemy) && enemy.IsAlive) count++;
             return count;
         }
 
+        /// <summary>
+        /// Unity's == operator returns true for destroyed objects, but plain references stored in
+        /// a managed list do not become null. Equals(null) detects the destroyed-backed case so a
+        /// stale entry can never keep a wave "alive" forever and stall progression.
+        /// </summary>
+        private static bool IsLive(EnemyUnit enemy) => !enemy.Equals(null);
+
         private void ClearEnemies()
         {
-            foreach (var enemy in enemies) if (enemy != null) Destroy(enemy.gameObject);
+            foreach (var enemy in enemies)
+                if (enemy != null && !enemy.Equals(null) && enemy.gameObject != null)
+                    Destroy(enemy.gameObject);
             enemies.Clear();
         }
 

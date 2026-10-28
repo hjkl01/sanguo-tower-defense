@@ -99,6 +99,9 @@ namespace SanguoTowerDefense.App
                 message =>
                 {
                     battleRunning = false;
+                    // Record progress before the refund sync: winning is what raises the ceiling.
+                    if (message != null && message.StartsWith("胜利"))
+                        highestWaveCleared = BattleTuning.MaxWaves;
                     SyncBattleHeroes();
                     UpdateBattleButton();
                     SaveGame();
@@ -426,12 +429,19 @@ namespace SanguoTowerDefense.App
 
         private void StartNewGame()
         {
+            // Stop any live battle first so the old BattleController never holds references
+            // to hero copies removed from the discarded roster.
+            if (battleController != null) battleController.StopBattle();
+            battleRunning = false;
+            UpdateBattleButton();
+
             roster = new HeroRoster();
             upgrades = new HeroUpgradeService(roster, 2, 100);
             formation = new FormationService(roster, BattleTuning.SlotCount);
             gacha = new GachaService(roster, gachaEntries);
             currency = BattleTuning.StartingCoins;
             highestWaveCleared = 0;
+            nextFormationSlot = 0;
             for (var i = 0; i < Mathf.Min(BattleTuning.SlotCount, definitions.Count); i++)
                 roster.Add(new HeroInstance(definitions[i].HeroId));
             SyncBattleHeroes();
