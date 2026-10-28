@@ -33,7 +33,7 @@
 - HeroDefinition：武将模板，不存储玩家拥有状态。
 - HeroInstance：单份收藏副本，具有唯一 InstanceId、HeroId 和等级。
 - HeroRoster：副本集合，负责查找、添加和移除。
-- GachaService：根据权重产生副本。
+- GachaService：根据三档卡池的等级命中率和目录中的 hero tier 产生副本；按等级分组归一化，避免同等级武将数量影响该等级总概率。
 - HeroUpgradeService：校验材料并原子地消耗材料、升级目标。
 - FormationService：管理固定点位与副本 ID 的映射。
 - UI 层只负责展示状态、收集输入和调用服务，不直接绕过业务规则修改数据。
@@ -47,6 +47,7 @@
 - attackInterval：攻击间隔秒数，至少为 0.1。
 - attackRange：原型中的攻击距离。
 - faction / rarity：必须匹配代码中的枚举名称。
+- tier：武将抽卡等级，取值 Basic、Intermediate、Advanced；初级卡可抽初级/中级，中级卡可抽全部等级，高级卡可抽中级/高级。
 
 在 Unity 中执行菜单 Sanguo/Import Hero Catalog，会生成或更新 Assets/Resources/Heroes/<heroId>.asset。导入工具不会删除目录中已存在但不在 JSON 中的资源。
 
