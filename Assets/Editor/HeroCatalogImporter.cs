@@ -15,8 +15,8 @@ namespace SanguoTowerDefense.Editor
     {
         public string heroId;
         public string displayName;
-        public HeroFaction faction;
-        public HeroRarity rarity;
+        public string faction;
+        public string rarity;
         public int baseAttack;
         public int baseHealth;
         public float attackInterval;
@@ -68,8 +68,10 @@ namespace SanguoTowerDefense.Editor
                 var serialized = new SerializedObject(asset);
                 serialized.FindProperty("heroId").stringValue = entry.heroId;
                 serialized.FindProperty("displayName").stringValue = entry.displayName;
-                serialized.FindProperty("faction").enumValueIndex = (int)entry.faction;
-                serialized.FindProperty("rarity").enumValueIndex = (int)entry.rarity;
+                if (!Enum.TryParse(entry.faction, true, out HeroFaction faction)) faction = HeroFaction.Qun;
+                if (!Enum.TryParse(entry.rarity, true, out HeroRarity rarity)) rarity = HeroRarity.Common;
+                serialized.FindProperty("faction").enumValueIndex = (int)faction;
+                serialized.FindProperty("rarity").enumValueIndex = (int)rarity;
                 serialized.FindProperty("baseAttack").intValue = Mathf.Max(1, entry.baseAttack);
                 serialized.FindProperty("baseHealth").intValue = Mathf.Max(0, entry.baseHealth);
                 serialized.FindProperty("attackInterval").floatValue = Mathf.Max(0.1f, entry.attackInterval);
