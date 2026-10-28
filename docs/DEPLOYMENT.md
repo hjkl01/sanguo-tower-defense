@@ -78,31 +78,36 @@ npx serve Builds/WebGL
 3. Build Settings → **Build** 生成 `.apk`，或 **Build And Run** 直接安装到已连接的设备（需开启 USB 调试）。
 4. 存档位置：应用私有目录 `persistentDataPath`（卸载应用即清除）。
 
-## 5. CI 自动构建（可选）
+## 5. CI 自动构建并发布 Release（已配置）
 
-如需在 GitHub Actions 中自动出包，可使用 Unity 官方激活 + [game-ci/unity-builder](https://game-ci.com)：
+本仓库已内置工作流 **`.github/workflows/build-unity.yml`**，基于 [game-ci/unity-builder](https://game-ci.com)，使用 Unity 版本由 `ProjectSettings/ProjectVersion.txt`（2022.3 LTS）自动决定。触发方式：
 
-```yaml
-# .github/workflows/build.yml （示意）
-name: Build WebGL
-on: [workflow_dispatch]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        with:
-          targetPlatform: WebGL
-      - uses: actions/upload-artifact@v4
-        with:
-          name: webgl-build
-          path: build/WebGL
+- **推送 `v*` 标签**（如 `git tag v0.1.0 && git push origin v0.1.0`）→ 构建 WebGL → 自动创建 GitHub Release 并上传 `sanguo-webgl.zip`；
+- **Actions 页面手动触发**（workflow_dispatch）→ 仅构建并产出 workflow artifact，不发 Release。
+
+### 首次使用前需配置的 Secrets
+
+GitHub 仓库 → Settings → Secrets and variables → Actions → New repository secret：
+
+| Secret 名称 | 说明 |
+| --- | --- |
+| `UNITY_LICENSE` | Unity 许可证文件内容（见下） |
+| `UNITY_EMAIL` | Unity 账号邮箱 |
+| `UNITY_PASSWORD` | Unity 账号密码（若开启两步验证，请改用 `UNITY_LICENSE` + serial 方案或 App Password） |
+
+个人版（Personal）许可证可用 [game-ci license-activate action](https://game-ci.com/docs/license) 在本地一键获取：
+
+```bash
+docker run --rm -e UNITY_EMAIL -e UNITY_PASSWORD -e UNITY_LICENSE \
+  -v $HOME:/root ghcr.io/game-ci/unity-license-activate
 ```
 
-需要先在本地用 Unity 完成一次免费激活并生成 `UNITY_LICENSE` secret。
+执行后 `$HOME/.local/share/unity3d/License.ulf` 的内容即为要填入 `UNITY_LICENSE` 的值。注意：同一许可证最多同时在 2 台机器上激活，CI 每次运行会复用该 secret，请勿在多处并发构建。
+
+### 产物说明
+
+- `build/WebGL/` 打包为 `sanguo-webgl.zip`，解压后仍需通过 HTTP 服务访问（见 4.2），或直接上传到 itch.io / GitHub Pages。
+- Release 标题与变更说明由 `generate_release_notes` 根据合并的 PR / commit 自动生成。
 
 ## 6. 常见问题（FAQ）
 
