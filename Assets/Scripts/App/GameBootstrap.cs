@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using SanguoTowerDefense.Battle;
 using SanguoTowerDefense.Data;
 using SanguoTowerDefense.Domain;
 using SanguoTowerDefense.Services;
@@ -35,6 +36,8 @@ namespace SanguoTowerDefense.App
         private Text statusText;
         private Text rosterText;
         private Text formationText;
+        private Button battleButton;
+        private BattleController battleController;
         private int currency = 0;
         private int selectedIndex;
         private bool battleRunning;
@@ -53,6 +56,13 @@ namespace SanguoTowerDefense.App
             // A small starter collection lets players try the prototype without first drawing.
             for (var i = 0; i < Mathf.Min(5, definitions.Count); i++)
                 roster.Add(new HeroInstance(definitions[i].HeroId));
+
+            battleController = new GameObject("BattleController").AddComponent<BattleController>();
+            battleController.Initialize(
+                amount => { currency += amount; RefreshUi("击败敌人，获得 " + amount + " 金币。"); },
+                health => { baseHealth = health; },
+                message => { battleRunning = false; RefreshUi(message); UpdateBattleButton(); },
+                message => RefreshUi(message));
             RefreshUi("欢迎来到三国烽火。抽卡、升级武将并部署到固定点位。");
         }
 
@@ -101,7 +111,7 @@ namespace SanguoTowerDefense.App
             scaler.matchWidthOrHeight = 0.5f;
 
             var background = CreatePanel(canvas.transform, "Background", new Vector2(0, 0), new Vector2(1, 1),
-                new Color(0.075f, 0.09f, 0.13f, 1));
+                new Color(0.075f, 0.09f, 0.13f, 0.34f));
             var header = CreateText(background, "Title", "三国烽火  |  武将收集与塔防原型", 30, TextAnchor.MiddleLeft);
             SetRect(header.rectTransform, new Vector2(0.04f, 0.84f), new Vector2(0.96f, 0.97f));
 
@@ -109,7 +119,7 @@ namespace SanguoTowerDefense.App
             SetRect(statusText.rectTransform, new Vector2(0.04f, 0.76f), new Vector2(0.96f, 0.84f));
 
             var left = CreatePanel(background, "RosterPanel", new Vector2(0.04f, 0.13f), new Vector2(0.57f, 0.74f),
-                new Color(0.12f, 0.15f, 0.2f, 1));
+                new Color(0.12f, 0.15f, 0.2f, 0.76f));
             rosterText = CreateText(left, "Roster", "", 17, TextAnchor.UpperLeft);
             SetRect(rosterText.rectTransform, new Vector2(0.04f, 0.12f), new Vector2(0.96f, 0.96f));
 
@@ -123,7 +133,7 @@ namespace SanguoTowerDefense.App
             CreateButton(background, "高级卡 100 金币", new Vector2(0.335f, 0.035f), new Vector2(0.49f, 0.105f), () => DrawHero(GachaCardTier.Advanced));
             CreateButton(background, "升级选中", new Vector2(0.50f, 0.035f), new Vector2(0.62f, 0.105f), () => UpgradeSelected());
             CreateButton(background, "上阵 / 换将", new Vector2(0.63f, 0.035f), new Vector2(0.75f, 0.105f), () => DeploySelected());
-            CreateButton(background, battleRunning ? "结束战斗" : "开始战斗", new Vector2(0.76f, 0.035f), new Vector2(0.87f, 0.105f), () => ToggleBattle());
+            battleButton = CreateButton(background, "开始战斗", new Vector2(0.76f, 0.035f), new Vector2(0.87f, 0.105f), () => ToggleBattle());
             CreateButton(background, "选择下一名", new Vector2(0.88f, 0.035f), new Vector2(0.975f, 0.105f), () => SelectNext());
         }
 
@@ -167,20 +177,61 @@ namespace SanguoTowerDefense.App
             var index = Array.FindIndex(slots.ToArray(), string.IsNullOrEmpty);
             if (index < 0) index = 0;
             if (formation.TrySwitchHero(index, selected.InstanceId, out var error))
+            {
+                if (battleRunning) SyncBattleHeroes();
                 RefreshUi(GetName(selected.HeroId) + " 已部署到点位 " + (index + 1) + "。");
+            }
             else RefreshUi(error);
         }
 
         private void ToggleBattle()
         {
-            battleRunning = !battleRunning;
             if (battleRunning)
             {
-                wave = 1;
-                baseHealth = 20;
-                RefreshUi("战斗开始：第 1 波（战斗逻辑仍处于原型阶段）。");
+                battleController.StopBattle();
+                battleRunning = false;
+                RefreshUi("已结束当前战斗。");
             }
-            else RefreshUi("已结束当前战斗。");
+            else
+            {
+                SyncBattleHeroes();
+                battleRunning = true;
+                battleController.StartBattle();
+                wave = 1;
+                RefreshUi("战斗开始：自动攻击敌人，击杀获得金币。");
+            }
+            UpdateBattleButton();
+        }
+
+        private void SyncBattleHeroes()
+        {
+            var configs = new List<BattleHeroConfig>();
+            var slots = formation.GetSnapshot();
+            for (var i = 0; i < slots.Count; i++)
+            {
+                if (string.IsNullOrEmpty(slots[i])) continue;
+                var instance = roster.Find(slots[i]);
+                if (instance == null) continue;
+                var definition = definitions.FirstOrDefault(x => x.HeroId == instance.HeroId);
+                if (definition == null) continue;
+                configs.Add(new BattleHeroConfig
+                {
+                    SlotIndex = i,
+                    DisplayName = definition.DisplayName,
+                    Attack = Mathf.Max(1, Mathf.RoundToInt(definition.BaseAttack * (1f + (instance.Level - 1) * 0.25f))),
+                    AttackInterval = definition.AttackInterval,
+                    AttackRange = definition.AttackRange,
+                    Level = instance.Level
+                });
+            }
+            battleController.SetHeroes(configs);
+        }
+
+        private void UpdateBattleButton()
+        {
+            if (battleButton == null) return;
+            var label = battleButton.GetComponentInChildren<Text>();
+            if (label != null) label.text = battleRunning ? "结束战斗" : "开始战斗";
         }
 
         private void SelectNext()
@@ -249,6 +300,9 @@ namespace SanguoTowerDefense.App
                 lines.Add("抽卡：初级 20 / 中级 50 / 高级 100 金币");
                 lines.Add("武将分级：普通/稀有=初级，史诗=中级，传说=高级");
                 lines.Add("金币来源：战斗击败敌人获得。");
+                lines.Add("基地生命：" + baseHealth + " / 20");
+                if (battleController != null && battleRunning)
+                    lines.Add("战斗波次：" + battleController.CurrentWave + " / 5，场上敌人：" + battleController.ActiveEnemyCount);
                 formationText.text = string.Join("\n", lines);
             }
         }
@@ -276,7 +330,7 @@ namespace SanguoTowerDefense.App
             return text;
         }
 
-        private static void CreateButton(Transform parent, string label, Vector2 min, Vector2 max, Action action)
+        private static Button CreateButton(Transform parent, string label, Vector2 min, Vector2 max, Action action)
         {
             var obj = new GameObject(label, typeof(RectTransform), typeof(Image), typeof(Button));
             obj.transform.SetParent(parent, false);
@@ -286,6 +340,7 @@ namespace SanguoTowerDefense.App
             obj.GetComponent<Button>().onClick.AddListener(() => action());
             var text = CreateText(obj.transform, "Label", label, 16, TextAnchor.MiddleCenter);
             SetRect(text.rectTransform, Vector2.zero, Vector2.one);
+            return obj.GetComponent<Button>();
         }
 
         private static void SetRect(RectTransform rect, Vector2 min, Vector2 max)
