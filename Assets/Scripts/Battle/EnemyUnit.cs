@@ -18,6 +18,26 @@ namespace SanguoTowerDefense.Battle
         public bool IsAlive => !resolved && health > 0f;
         public float Health => Mathf.Max(0f, health);
 
+        /// <summary>Normalized 0..1 progress along the path; used for "furthest along" targeting.</summary>
+        public float PathProgress
+        {
+            get
+            {
+                if (path == null || path.Length < 2) return 0f;
+                var total = 0f;
+                var done = 0f;
+                for (var i = 1; i < path.Length; i++)
+                {
+                    var segment = Vector3.Distance(path[i - 1], path[i]);
+                    total += segment;
+                    if (i < pathIndex) done += segment;
+                    else if (i == pathIndex)
+                        done += Mathf.Clamp01(segment - Vector3.Distance(transform.position, path[i])) ;
+                }
+                return total <= 0f ? 0f : Mathf.Clamp01(done / total);
+            }
+        }
+
         public void Initialize(Vector3[] route, float maxHealth, float moveSpeed, int coinReward,
             Action<EnemyUnit, int> onKilled, Action<EnemyUnit> onReachedBase)
         {

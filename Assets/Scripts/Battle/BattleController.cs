@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using SanguoTowerDefense.Data;
 using UnityEngine;
 
 namespace SanguoTowerDefense.Battle
@@ -15,11 +14,9 @@ namespace SanguoTowerDefense.Battle
         public int Level;
     }
 
-    /// <summary>Owns path, waves, base health, tower slots, rewards, and battle outcome.</summary>
+    /// <summary>Owns path, waves, base health, tower slots, rewards, pause and battle outcome.</summary>
     public sealed class BattleController : MonoBehaviour
     {
-        private const int MaxWaves = 5;
-        private const int StartingBaseHealth = 20;
         private readonly List<EnemyUnit> enemies = new List<EnemyUnit>();
         private readonly List<HeroBattleUnit> towers = new List<HeroBattleUnit>();
         private readonly Vector3[] path =
@@ -29,6 +26,7 @@ namespace SanguoTowerDefense.Battle
             new Vector3(-1.2f, -1.5f, 0f), new Vector3(2.4f, -1.5f, 0f),
             new Vector3(2.4f, 2.1f, 0f), new Vector3(8f, 2.1f, 0f)
         };
+        // Positions chosen so every point sits within the attack range of at least one slot.
         private readonly Vector3[] towerPositions =
         {
             new Vector3(-6.4f, -0.6f, 0f), new Vector3(-3.1f, 1.6f, 0f),
@@ -43,16 +41,20 @@ namespace SanguoTowerDefense.Battle
         private Action<string> onBattleEnded;
         private Action<string> onStatusChanged;
         private bool running;
+        private bool paused;
         private int currentWave;
         private int spawnedThisWave;
         private int enemiesThisWave;
-        private int baseHealth = StartingBaseHealth;
+        private int baseHealth = BattleTuning.StartingBaseHealth;
         private float spawnTimer;
         private float intermissionTimer;
         private bool waitingForNextWave;
+        private bool battleFinished;
 
         public bool IsRunning => running;
+        public bool IsPaused => paused;
         public int CurrentWave => currentWave;
+        public int MaxWaveCount => BattleTuning.MaxWaves;
         public int BaseHealth => baseHealth;
         public int ActiveEnemyCount => CountLivingEnemies();
 
@@ -83,24 +85,37 @@ namespace SanguoTowerDefense.Battle
             EnsureSceneObjects();
             ClearEnemies();
             running = true;
+            paused = false;
+            battleFinished = false;
             currentWave = 1;
-            baseHealth = StartingBaseHealth;
+            baseHealth = BattleTuning.StartingBaseHealth;
             onBaseHealthChanged?.Invoke(baseHealth);
             BeginWave();
-            onStatusChanged?.Invoke("战斗开始：第 1/" + MaxWaves + " 波。击败敌人可获得金币。");
+            onStatusChanged?.Invoke("战斗开始：第 1/" + BattleTuning.MaxWaves + " 波。击败敌人可获得金币。");
         }
 
         public void StopBattle()
         {
+            if (!running) return;
             running = false;
+            paused = false;
+            // Refund deployment so stopping mid-battle never destroys equipped copies.
+            for (var i = 0; i < towers.Count; i++) towers[i].ClearHero();
             ClearEnemies();
             waitingForNextWave = false;
-            onStatusChanged?.Invoke("战斗已停止。");
+            onStatusChanged?.Invoke("战斗已停止，阵容已返还。");
+        }
+
+        public void TogglePause()
+        {
+            if (!running || battleFinished) return;
+            paused = !paused;
+            onStatusChanged?.Invoke(paused ? "战斗已暂停。" : "战斗继续。");
         }
 
         private void Update()
         {
-            if (!running) return;
+            if (!running || paused) return;
 
             for (var i = enemies.Count - 1; i >= 0; i--)
                 if (enemies[i] == null || !enemies[i].IsAlive)
@@ -119,10 +134,19 @@ namespace SanguoTowerDefense.Battle
             }
 
             if (CountLivingEnemies() > 0) return;
-            if (currentWave >= MaxWaves)
+
+            // Wave cleared: pay the fixed bonus before checking for final victory.
+            if (!waitingForNextWave && currentWave >= 1 && spawnedThisWave >= enemiesThisWave)
+            {
+                onCoinsEarned?.Invoke(BattleTuning.WaveClearBonus);
+            }
+
+            if (currentWave >= BattleTuning.MaxWaves)
             {
                 running = false;
-                onBattleEnded?.Invoke("胜利！完成全部 " + MaxWaves + " 波次。");
+                battleFinished = true;
+                onStatusChanged?.Invoke("第 " + BattleTuning.MaxWaves + " 波完成，获得 " + BattleTuning.WaveClearBonus + " 金币奖励。");
+                onBattleEnded?.Invoke("胜利！完成全部 " + BattleTuning.MaxWaves + " 波次。");
                 return;
             }
 
@@ -130,7 +154,7 @@ namespace SanguoTowerDefense.Battle
             {
                 waitingForNextWave = true;
                 intermissionTimer = 2.5f;
-                onStatusChanged?.Invoke("第 " + currentWave + " 波完成，下一波即将开始。");
+                onStatusChanged?.Invoke("第 " + currentWave + " 波完成，获得 " + BattleTuning.WaveClearBonus + " 金币，下一波即将开始。");
             }
             else
             {
@@ -139,7 +163,7 @@ namespace SanguoTowerDefense.Battle
                 {
                     currentWave++;
                     BeginWave();
-                    onStatusChanged?.Invoke("第 " + currentWave + "/" + MaxWaves + " 波开始。");
+                    onStatusChanged?.Invoke("第 " + currentWave + "/" + BattleTuning.MaxWaves + " 波开始。");
                 }
             }
         }
@@ -170,7 +194,6 @@ namespace SanguoTowerDefense.Battle
         private void HandleEnemyKilled(EnemyUnit enemy, int reward)
         {
             onCoinsEarned?.Invoke(reward);
-            onStatusChanged?.Invoke("击败敌人，获得 " + reward + " 金币。");
         }
 
         private void HandleEnemyReachedBase(EnemyUnit enemy)
@@ -180,12 +203,13 @@ namespace SanguoTowerDefense.Battle
             if (baseHealth <= 0)
             {
                 running = false;
+                battleFinished = true;
                 ClearEnemies();
                 onBattleEnded?.Invoke("失败：基地生命归零。");
             }
             else
             {
-                onStatusChanged?.Invoke("敌人抵达终点，基地生命 -" + 1 + "。");
+                onStatusChanged?.Invoke("敌人抵达终点，基地生命 -1。");
             }
         }
 

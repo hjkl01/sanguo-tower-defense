@@ -44,6 +44,14 @@ namespace SanguoTowerDefense.Services
             }
         }
 
+        /// <summary>Ten-pull discount: 10% off ten single draws of the given card tier (e.g. basic 200 -> 180).</summary>
+        public static int GetTenPullCost(GachaCardTier cardTier, int count = 10)
+        {
+            if (count < 1) throw new ArgumentOutOfRangeException(nameof(count));
+            var full = checked(GetCost(cardTier) * count);
+            return full - full / 10;
+        }
+
         public HeroInstance Draw() => Draw(GachaCardTier.Basic);
 
         public HeroInstance Draw(GachaCardTier cardTier)

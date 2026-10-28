@@ -4,13 +4,14 @@ using UnityEngine;
 
 namespace SanguoTowerDefense.Battle
 {
-    /// <summary>One fixed defense slot. It automatically targets the nearest enemy in range.</summary>
+    /// <summary>One fixed defense slot. It automatically targets the enemy furthest along a path within range.</summary>
     public sealed class HeroBattleUnit : MonoBehaviour
     {
         private BattleHeroConfig hero;
         private Func<IReadOnlyList<EnemyUnit>> enemyProvider;
         private SpriteRenderer spriteRenderer;
         private Sprite sprite;
+        // Cooldown starts "cold" so (re)deploying a hero cannot reset-and-fire for free DPS.
         private float attackTimer;
 
         public void Initialize(Sprite unitSprite)
@@ -24,7 +25,8 @@ namespace SanguoTowerDefense.Battle
         {
             hero = config;
             enemyProvider = getEnemies;
-            attackTimer = 0f;
+            var interval = Mathf.Max(0.1f, config.AttackInterval);
+            attackTimer = interval * 0.5f;
             if (spriteRenderer != null) spriteRenderer.color = new Color(0.25f, 0.78f, 0.42f, 1f);
             gameObject.name = "HeroSlot_" + (config.SlotIndex + 1) + "_" + config.DisplayName;
         }
@@ -33,6 +35,7 @@ namespace SanguoTowerDefense.Battle
         {
             hero = null;
             enemyProvider = null;
+            attackTimer = 0f;
             if (spriteRenderer != null) spriteRenderer.color = new Color(0.25f, 0.48f, 0.82f, 1f);
         }
 
@@ -44,22 +47,31 @@ namespace SanguoTowerDefense.Battle
 
             var enemies = enemyProvider();
             EnemyUnit target = null;
-            var nearest = float.MaxValue;
+            var bestProgress = -1f;
+            var range = Mathf.Max(0.1f, hero.AttackRange);
             if (enemies != null)
             {
                 foreach (var enemy in enemies)
                 {
                     if (enemy == null || !enemy.IsAlive) continue;
                     var distance = Vector2.Distance(transform.position, enemy.transform.position);
-                    if (distance <= Mathf.Max(0.1f, hero.AttackRange) && distance < nearest)
+                    if (distance > range) continue;
+                    // Prioritize the enemy closest to the base instead of the nearest one.
+                    var progress = enemy.PathProgress;
+                    if (progress > bestProgress)
                     {
+                        bestProgress = progress;
                         target = enemy;
-                        nearest = distance;
                     }
                 }
             }
 
-            if (target == null) return;
+            if (target == null)
+            {
+                // Keep the cooldown ready to fire the moment a target appears.
+                attackTimer = 0f;
+                return;
+            }
             target.TakeDamage(Mathf.Max(1, hero.Attack));
             attackTimer = Mathf.Max(0.1f, hero.AttackInterval);
         }
