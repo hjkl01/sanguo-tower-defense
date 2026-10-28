@@ -29,6 +29,16 @@
 
 ## 当前阶段
 
-当前提交包含 50 名武将数据、Unity 编辑器导入工具，以及抽卡、武将收藏、同等级合成和固定点位布阵的 C# 核心系统。打开 Unity 项目后，使用菜单 **Sanguo → Import Hero Catalog** 将 JSON 中的武将生成可编辑的 HeroDefinition 资源。仓库尚未包含完整场景和 UI，下一阶段继续实现可运行的战斗原型。
+仓库已补齐 Unity 项目基础结构，包括 Packages 清单、Unity 版本、主场景、运行时启动脚本、50 名武将数据和设计文档。主场景会从 JSON 读取武将目录并生成基础原型 UI，可试用抽卡、选中武将、合成和固定点位部署。
+
+### 本地运行
+
+1. 安装 Unity Hub，并安装 Unity 2022.3 LTS（项目版本见 ProjectSettings/ProjectVersion.txt）。
+2. 克隆仓库，在 Unity Hub 中选择 **Add project from disk**，指向仓库根目录。
+3. 等待 Unity 导入资源和编译脚本。
+4. 打开 Assets/Scenes/Main.unity，点击 Play。
+5. 如果需要把武将数据变成可在 Inspector 中编辑的资源，执行菜单 **Sanguo → Import Hero Catalog**。
+
+当前 UI 和战斗入口属于功能原型；敌人路径、自动攻击、波次、奖励结算、存档和正式美术仍在后续开发范围。GitHub 提交尚未在本环境中通过 Unity Editor 实际构建验证。
 
 建议使用 Unity 2022.3 LTS 或更新的 LTS 版本。
