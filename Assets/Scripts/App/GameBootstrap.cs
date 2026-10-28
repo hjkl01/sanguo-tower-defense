@@ -18,6 +18,7 @@ namespace SanguoTowerDefense.App
             public string displayName;
             public string faction;
             public string rarity;
+            public string tier;
             public int baseAttack;
             public int baseHealth;
             public float attackInterval;
@@ -34,7 +35,7 @@ namespace SanguoTowerDefense.App
         private Text statusText;
         private Text rosterText;
         private Text formationText;
-        private int currency = 100;
+        private int currency = 0;
         private int selectedIndex;
         private bool battleRunning;
         private int wave;
@@ -79,9 +80,11 @@ namespace SanguoTowerDefense.App
                 var definition = HeroDefinition.CreateRuntime(item.heroId, item.displayName, faction, rarity,
                     item.baseAttack, item.baseHealth, item.attackInterval, item.attackRange, item.description);
                 definitions.Add(definition);
-                var rarityWeight = rarity == HeroRarity.Legendary ? 2 :
-                    rarity == HeroRarity.Epic ? 8 : rarity == HeroRarity.Rare ? 25 : 65;
-                gachaEntries.Add(new GachaEntry { Hero = definition, Weight = rarityWeight });
+                var tier = HeroTier.Basic;
+                if (!Enum.TryParse(item.tier, true, out tier))
+                    tier = rarity == HeroRarity.Legendary ? HeroTier.Advanced :
+                        rarity == HeroRarity.Epic ? HeroTier.Intermediate : HeroTier.Basic;
+                gachaEntries.Add(new GachaEntry { Hero = definition, Tier = tier });
             }
 
             if (definitions.Count == 0) Debug.LogError("Hero catalog contains no usable heroes.");
@@ -115,22 +118,25 @@ namespace SanguoTowerDefense.App
             formationText = CreateText(right, "Formation", "", 18, TextAnchor.UpperLeft);
             SetRect(formationText.rectTransform, new Vector2(0.06f, 0.25f), new Vector2(0.94f, 0.95f));
 
-            CreateButton(background, "抽卡（20 金币）", new Vector2(0.04f, 0.035f), new Vector2(0.19f, 0.105f), () => DrawHero());
-            CreateButton(background, "升级选中武将", new Vector2(0.205f, 0.035f), new Vector2(0.36f, 0.105f), () => UpgradeSelected());
-            CreateButton(background, "上阵 / 换将", new Vector2(0.375f, 0.035f), new Vector2(0.53f, 0.105f), () => DeploySelected());
-            CreateButton(background, battleRunning ? "结束战斗" : "开始战斗", new Vector2(0.62f, 0.035f), new Vector2(0.77f, 0.105f), () => ToggleBattle());
-            CreateButton(background, "选择下一名", new Vector2(0.795f, 0.035f), new Vector2(0.96f, 0.105f), () => SelectNext());
+            CreateButton(background, "初级卡 20 金币", new Vector2(0.025f, 0.035f), new Vector2(0.17f, 0.105f), () => DrawHero(GachaCardTier.Basic));
+            CreateButton(background, "中级卡 50 金币", new Vector2(0.18f, 0.035f), new Vector2(0.325f, 0.105f), () => DrawHero(GachaCardTier.Intermediate));
+            CreateButton(background, "高级卡 100 金币", new Vector2(0.335f, 0.035f), new Vector2(0.49f, 0.105f), () => DrawHero(GachaCardTier.Advanced));
+            CreateButton(background, "升级选中", new Vector2(0.50f, 0.035f), new Vector2(0.62f, 0.105f), () => UpgradeSelected());
+            CreateButton(background, "上阵 / 换将", new Vector2(0.63f, 0.035f), new Vector2(0.75f, 0.105f), () => DeploySelected());
+            CreateButton(background, battleRunning ? "结束战斗" : "开始战斗", new Vector2(0.76f, 0.035f), new Vector2(0.87f, 0.105f), () => ToggleBattle());
+            CreateButton(background, "选择下一名", new Vector2(0.88f, 0.035f), new Vector2(0.975f, 0.105f), () => SelectNext());
         }
 
-        private void DrawHero()
+        private void DrawHero(GachaCardTier cardTier)
         {
-            if (currency < 20) { RefreshUi("金币不足。"); return; }
-            currency -= 20;
+            var cost = GachaService.GetCost(cardTier);
+            if (currency < cost) { RefreshUi("金币不足：该卡需要 " + cost + " 金币，请通过战斗击败敌人获取金币。"); return; }
+            currency -= cost;
             try
             {
-                var hero = gacha.Draw();
+                var hero = gacha.Draw(cardTier);
                 selectedIndex = Mathf.Max(0, roster.All.ToList().FindIndex(x => x.InstanceId == hero.InstanceId));
-                RefreshUi("招募获得：" + GetName(hero.HeroId) + "。");
+                RefreshUi(CardTierName(cardTier) + "招募获得：" + GetName(hero.HeroId) + "。");
             }
             catch (Exception ex) { RefreshUi("抽卡失败：" + ex.Message); }
         }
@@ -194,6 +200,17 @@ namespace SanguoTowerDefense.App
             return list[selectedIndex];
         }
 
+        private static string CardTierName(GachaCardTier tier)
+        {
+            switch (tier)
+            {
+                case GachaCardTier.Basic: return "初级卡";
+                case GachaCardTier.Intermediate: return "中级卡";
+                case GachaCardTier.Advanced: return "高级卡";
+                default: return "抽卡";
+            }
+        }
+
         private string GetName(string heroId)
         {
             var hero = definitions.FirstOrDefault(x => x.HeroId == heroId);
@@ -229,7 +246,9 @@ namespace SanguoTowerDefense.App
                 lines.Add("");
                 lines.Add("武将总数：" + definitions.Count);
                 lines.Add("升级材料：" + upgrades.MaterialsRequired + " 个同名同等级副本");
-                lines.Add("说明：战斗与场景仍待下一阶段实现。");
+                lines.Add("抽卡：初级 20 / 中级 50 / 高级 100 金币");
+                lines.Add("武将分级：普通/稀有=初级，史诗=中级，传说=高级");
+                lines.Add("金币来源：战斗击败敌人获得。");
                 formationText.text = string.Join("\n", lines);
             }
         }
