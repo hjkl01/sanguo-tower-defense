@@ -19,7 +19,7 @@
         Main.unity             # 主场景
       Scripts/
         App/                   # 游戏启动和 UI 组合
-        Battle/                # 敌人、波次、战斗循环
+        Battle/                # BattleController、EnemyUnit、HeroBattleUnit
         Data/                  # 静态数据模板
         Domain/                # 可测试的领域对象
         Persistence/           # 本地存档
@@ -37,6 +37,9 @@
 - HeroUpgradeService：校验材料并原子地消耗材料、升级目标。
 - FormationService：管理固定点位与副本 ID 的映射。
 - UI 层只负责展示状态、收集输入和调用服务，不直接绕过业务规则修改数据。
+- BattleController：创建路径和固定点位，管理波次、基地生命、胜负与金币奖励。
+- EnemyUnit：管理单个敌人的路径移动、生命、死亡和抵达终点事件。
+- HeroBattleUnit：绑定固定点位，按攻击力、攻击间隔和射程自动寻找目标。
 - 战斗中的单位状态与局外武将副本状态分开管理，避免敌人死亡、临时 Buff 等污染永久收藏。
 
 ## 4. 武将目录扩展
@@ -62,4 +65,4 @@
 
 ## 6. 当前限制
 
-当前仓库处于原型阶段。初始场景和运行时 UI 用于打通流程，不代表最终美术质量或平衡性。每次修改后需在 Unity Editor 中打开项目并检查 Console、脚本编译和实际运行效果。
+当前仓库处于原型阶段。战斗场景、敌人和防守点位由代码运行时创建，使用几何图形作为占位美术；本地存档、正式关卡配置、技能和动画尚未实现。每次修改后需在 Unity Editor 中打开项目并检查 Console、脚本编译和实际运行效果。

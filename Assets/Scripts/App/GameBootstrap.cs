@@ -48,6 +48,7 @@ namespace SanguoTowerDefense.App
         private int highestWaveCleared;
         private int selectedIndex;
         private int rosterPage;
+        private int nextFormationSlot;
         private bool battleRunning;
         private bool hasSave;
         private string lastMessage = "";
@@ -262,12 +263,22 @@ namespace SanguoTowerDefense.App
             if (selected == null) { RefreshUi("请先选择武将。"); return; }
             var slots = formation.GetSnapshot();
             var index = Array.FindIndex(slots.ToArray(), string.IsNullOrEmpty);
-            if (index < 0) { RefreshUi("所有点位已满，请先“下阵选中”或“清空阵容”。"); return; }
+            if (index < 0)
+            {
+                // 点位已满：循环切换到下一个点位（保留远程的满位轮换部署，同时保留本地的存档写入）
+                index = nextFormationSlot % slots.Count;
+                nextFormationSlot = (index + 1) % slots.Count;
+            }
+            else
+            {
+                nextFormationSlot = (index + 1) % slots.Count;
+            }
+
             if (formation.TrySwitchHero(index, selected.InstanceId, out var error))
             {
                 if (battleRunning) SyncBattleHeroes();
                 SaveGame();
-                RefreshUi(GetName(selected.HeroId) + " 已部署到点位 " + (index + 1) + "。");
+                RefreshUi(GetName(selected.HeroId) + " 已部署/切换到点位 " + (index + 1) + "。");
             }
             else RefreshUi(error);
         }
@@ -484,7 +495,12 @@ namespace SanguoTowerDefense.App
                 lines.Add("");
                 lines.Add("武将总数：" + definitions.Count);
                 lines.Add("升级材料：" + upgrades.MaterialsRequired + " 个同名同等级副本");
-                lines.Add("抽卡：初级 20 / 中级 50 / 高级 100 金币，十连 180");
+                lines.Add("抽卡价格：初级 20 / 中级 50 / 高级 100 金币，十连九折（初级 180 / 中级 450 / 高级 900）");
+                lines.Add("初级卡概率：初级 75% / 中级 25%");
+                lines.Add("中级卡概率：初级 55% / 中级 30% / 高级 15%");
+                lines.Add("高级卡概率：中级 60% / 高级 40%");
+                lines.Add("武将分级：普通/稀有=初级，史诗=中级，传说=高级");
+                lines.Add("金币来源：战斗击败敌人获得。");
                 lines.Add("基地生命：" + (battleController != null ? battleController.BaseHealth : BattleTuning.StartingBaseHealth) +
                     " / " + BattleTuning.StartingBaseHealth);
                 if (battleController != null && battleRunning)
