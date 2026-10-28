@@ -29,6 +29,22 @@ namespace SanguoTowerDefense.Data
         public float AttackRange => attackRange;
         public string Description => description;
 
+        public static HeroDefinition CreateRuntime(string id, string name, HeroFaction heroFaction,
+            HeroRarity heroRarity, int attack, int health, float interval, float range, string details)
+        {
+            var definition = CreateInstance<HeroDefinition>();
+            definition.heroId = id;
+            definition.displayName = name;
+            definition.faction = heroFaction;
+            definition.rarity = heroRarity;
+            definition.baseAttack = Mathf.Max(1, attack);
+            definition.baseHealth = Mathf.Max(0, health);
+            definition.attackInterval = Mathf.Max(0.1f, interval);
+            definition.attackRange = Mathf.Max(0f, range);
+            definition.description = details ?? string.Empty;
+            return definition;
+        }
+
         private void OnValidate()
         {
             heroId = heroId == null ? string.Empty : heroId.Trim();
