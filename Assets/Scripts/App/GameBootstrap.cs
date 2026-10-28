@@ -297,7 +297,10 @@ namespace SanguoTowerDefense.App
                 lines.Add("");
                 lines.Add("武将总数：" + definitions.Count);
                 lines.Add("升级材料：" + upgrades.MaterialsRequired + " 个同名同等级副本");
-                lines.Add("抽卡：初级 20 / 中级 50 / 高级 100 金币");
+                lines.Add("抽卡价格：初级 20 / 中级 50 / 高级 100 金币");
+                lines.Add("初级卡概率：初级 75% / 中级 25%");
+                lines.Add("中级卡概率：初级 55% / 中级 30% / 高级 15%");
+                lines.Add("高级卡概率：中级 60% / 高级 40%");
                 lines.Add("武将分级：普通/稀有=初级，史诗=中级，传说=高级");
                 lines.Add("金币来源：战斗击败敌人获得。");
                 lines.Add("基地生命：" + baseHealth + " / 20");
